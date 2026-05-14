@@ -12,7 +12,7 @@ class TerminalDashboard:
             "=== Robot Positioning Dashboard ===",
             f"Champion: {champion}",
             f"Active Model: {active_model}",
-            f"Current Battery: {battery_level:.2%}",
+            f"Start Battery: {battery_level:.2f}V",
             "Shadow Predictions:",
         ]
         if shadow_predictions:
