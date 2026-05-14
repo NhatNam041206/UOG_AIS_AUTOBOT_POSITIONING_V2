@@ -41,6 +41,7 @@ class TournamentManager:
         self.system_log_path = Path(env.get_val("SYSTEM_LOG_PATH", str, default="system.log"))
         self.champion_model_path = Path(env.get_val("CHAMPION_MODEL_PATH", str, default="champion_model.pkl"))
         self.physics_env = MockPhysicsEnv(env)
+        self._log_handler: logging.Handler | None = None
         self.logger = self._build_logger()
         self._rotation_index = 0
         self.competitors = self._build_competitors(estimator_factories)
@@ -55,7 +56,15 @@ class TournamentManager:
             handler = logging.FileHandler(self.system_log_path, encoding="utf-8")
             handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
             logger.addHandler(handler)
+            self._log_handler = handler
         return logger
+
+    def close(self) -> None:
+        if self._log_handler is None:
+            return
+        self.logger.removeHandler(self._log_handler)
+        self._log_handler.close()
+        self._log_handler = None
 
     def _build_competitors(self, estimator_factories: dict[str, Callable[[], BaseEstimator]] | None) -> dict[str, Competitor]:
         factories = estimator_factories or {
