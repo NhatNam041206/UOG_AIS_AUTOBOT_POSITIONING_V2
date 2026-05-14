@@ -20,13 +20,9 @@ def main() -> None:
         print(f"Experimental champion: {champion}")
         return
     if args.production_runs is not None:
-        outputs = manager.run_production(
-            manager.physics_env.generate_runs(args.production_runs, is_simulated=False)
-        )
-    else:
-        outputs = manager.run_production()
-    if outputs:
-        print(outputs[-1])
+        manager.run_production(manager.physics_env.generate_runs(args.production_runs, is_simulated=False))
+        return
+    manager.run_production()
 
 
 if __name__ == "__main__":
