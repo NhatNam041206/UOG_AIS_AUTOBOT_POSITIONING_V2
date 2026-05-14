@@ -144,7 +144,7 @@ class MockPhysicsEnv:
         self.payload_max = env.get_val("PAYLOAD_MAX", float, required=True)
         self.route_segment_count = env.get_val("ROUTE_SEGMENT_COUNT", int, default=7)
         if self.route_segment_count <= 0:
-            raise ValueError("ROUTE_SEGMENT_COUNT must be greater than zero")
+            raise ValueError("ROUTE_SEGMENT_COUNT must be at least 1")
         self.turn_target_min_deg = env.get_val("TURN_TARGET_MIN_DEG", float, default=45.0)
         self.turn_target_max_deg = env.get_val("TURN_TARGET_MAX_DEG", float, default=90.0)
 

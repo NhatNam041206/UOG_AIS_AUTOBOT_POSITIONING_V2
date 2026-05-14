@@ -119,14 +119,13 @@ class TournamentManager:
             run.active_champion_id = active_model
             run.shadow_predictions_json = json.dumps(
                 {name: float(value) for name, value in sorted(predictions.items()) if name != active_model},
-                sort_keys=True,
             )
             self._append_runs([run])
             history.append(run)
             outputs.append(
                 self.dashboard.render(
                     champion=self.champion_name,
-                    battery_level=run.start_battery_v,
+                    start_battery_v=run.start_battery_v,
                     active_model=active_model,
                     predictions=predictions,
                 )
