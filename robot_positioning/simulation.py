@@ -26,6 +26,12 @@ CSV_FIELDNAMES = [
     "active_champion_id",
     "shadow_predictions_json",
 ]
+PREV_RESIDUAL_DRIFT_FACTOR = 0.15
+ADDITIONAL_RESIDUAL_ANGULAR_FACTOR = 0.05
+FORWARD_ERROR_SCALE = 0.05
+TURN_ERROR_SCALE = 0.08
+PREV_RESIDUAL_DECAY = 0.5
+DRIFT_CONTRIBUTION = 0.3
 
 
 @dataclass
@@ -137,6 +143,8 @@ class MockPhysicsEnv:
         self.payload_min = env.get_val("PAYLOAD_MIN", float, required=True)
         self.payload_max = env.get_val("PAYLOAD_MAX", float, required=True)
         self.route_segment_count = env.get_val("ROUTE_SEGMENT_COUNT", int, default=7)
+        if self.route_segment_count <= 0:
+            raise ValueError("ROUTE_SEGMENT_COUNT must be greater than zero")
         self.turn_target_min_deg = env.get_val("TURN_TARGET_MIN_DEG", float, default=45.0)
         self.turn_target_max_deg = env.get_val("TURN_TARGET_MAX_DEG", float, default=90.0)
 
@@ -145,7 +153,7 @@ class MockPhysicsEnv:
         prev_cmd_id = 0
         prev_residual_angle = 0.0
         for index in range(count):
-            segment_index = (index % max(self.route_segment_count, 1)) + 1
+            segment_index = (index % self.route_segment_count) + 1
             run, prev_cmd_id, prev_residual_angle = self.generate_run(
                 is_simulated=is_simulated,
                 segment_index=segment_index,
@@ -171,7 +179,7 @@ class MockPhysicsEnv:
         start_battery_v = self._random.uniform(self.battery_min, self.battery_max)
         calibrations_count = self._random.randint(0, 2 if is_simulated else 4)
         drift_base = self._random.uniform(self.heading_min, self.heading_max)
-        avg_drift_angle = drift_base + (prev_residual_angle * 0.15)
+        avg_drift_angle = drift_base + (prev_residual_angle * PREV_RESIDUAL_DRIFT_FACTOR)
         total_calib_time = calibrations_count * self._random.uniform(0.03, 0.25)
         terrain_factor = self._random.uniform(self.terrain_min, self.terrain_max)
         payload = self._random.uniform(self.payload_min, self.payload_max)
@@ -180,7 +188,9 @@ class MockPhysicsEnv:
             target_units / max(self.speed, 0.1) if command_id == 0 else target_units / max(self.turn_speed_deg_per_sec, 1.0),
         )
         battery_penalty = expected_time * ((1 / max(start_battery_v, 0.05) ** self.battery_decay_exponent) - 1)
-        angular_penalty = abs(avg_drift_angle + prev_residual_angle * 0.05) * self.angular_drift_factor
+        angular_penalty = (
+            abs(avg_drift_angle + prev_residual_angle * ADDITIONAL_RESIDUAL_ANGULAR_FACTOR) * self.angular_drift_factor
+        )
         payload_penalty = payload * self.payload_factor
         environment_bias = 0.0 if is_simulated else self.real_world_bias
         noise = self._random.gauss(0.0, self.noise_std * (1.0 if is_simulated else 1.5))
@@ -195,7 +205,7 @@ class MockPhysicsEnv:
             + environment_bias
             + noise,
         )
-        command_error_scale = 0.05 if command_id == 0 else 0.08
+        command_error_scale = FORWARD_ERROR_SCALE if command_id == 0 else TURN_ERROR_SCALE
         noise_scale = 0.6 if is_simulated else 1.0
         error_cm_or_deg = self._random.gauss(
             prev_residual_angle * 0.1,
@@ -203,7 +213,9 @@ class MockPhysicsEnv:
         )
         actual_dist_reached = target_units - error_cm_or_deg
         next_residual_angle = (
-            error_cm_or_deg if command_id in (1, 2) else (prev_residual_angle * 0.5) + (avg_drift_angle * 0.3)
+            error_cm_or_deg
+            if command_id in (1, 2)
+            else (prev_residual_angle * PREV_RESIDUAL_DECAY) + (avg_drift_angle * DRIFT_CONTRIBUTION)
         )
         return RunRecord(
             segment_index=segment_index,
