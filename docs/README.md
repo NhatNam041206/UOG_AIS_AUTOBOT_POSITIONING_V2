@@ -78,6 +78,69 @@ Important examples:
 
 See `.env.example` for the full list.
 
+## Discovery Analysis Notebook
+
+`discovery_analysis.ipynb` is a self-contained Jupyter Notebook for offline analysis of
+the robot's run history and evaluation of the Tournament Model.
+
+### What it does
+
+1. **Data generation** — if `run_history.csv` is missing, it generates a synthetic dataset
+   (200 simulated + 50 real-world runs) using the built-in `MockPhysicsEnv`.
+2. **Data loading & cleaning** — loads the CSV with full schema validation and applies the
+   Transfer Learning weights (0.2 for simulated, 1.0 for real).
+3. **Shadow prediction parsing** — expands `shadow_predictions_json` into a flat comparison
+   table so every model's predictions can be audited per run.
+4. **Exploratory Data Analysis** — three visualisation sections:
+   - *Physics Check*: scatter of actual time vs. battery voltage to confirm the `V^1.2` power curve.
+   - *Debt Analysis*: correlation heatmap + scatter showing how `prev_residual_angle` from a
+     turn propagates into `total_calib_time` and `error_cm_or_deg` of the next forward segment.
+   - *Error Distribution*: histogram of `error_cm_or_deg` per command type to detect systematic
+     overshoot or undershoot bias.
+5. **Tournament Training** — trains all 6 competitors (Direct × Residual strategies for
+   LinearRegression, RandomForest, XGBoost) with Transfer Learning sample weights, evaluates
+   each on the real-world hold-out set, and ranks them by MAE.
+6. **Champion deep-dive** — actual-vs-predicted scatter, residuals histogram, and horizontal
+   feature importance chart for the `Residual_RF` model.
+7. **Model export** — saves the champion model as `champion_model.pkl` with all metadata
+   needed for production inference.
+
+### How to run
+
+1. Install dependencies (includes `notebook`, `pandas`, `matplotlib`, `seaborn`):
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
+2. Launch Jupyter:
+   ```bash
+   jupyter notebook discovery_analysis.ipynb
+   ```
+   Or, to run non-interactively from the command line:
+   ```bash
+   jupyter nbconvert --to notebook --execute discovery_analysis.ipynb --output discovery_analysis_executed.ipynb
+   ```
+3. **Cell by cell or Run All** — the notebook is designed to run top-to-bottom.
+   - If `run_history.csv` already exists in the repo root it will be loaded directly.
+   - If it does not exist it will be generated automatically in the first two cells.
+
+### Generated output files
+
+| File | Description |
+|---|---|
+| `physics_check.png` | Battery voltage vs. actual time scatter (saved to repo root) |
+| `debt_analysis.png` | Residual angle correlation heatmap and scatter |
+| `error_distribution.png` | Error histograms per command type |
+| `leaderboard.png` | Champion leaderboard bar chart |
+| `residual_rf_plot.png` | Actual vs. predicted time for Residual_RF |
+| `feature_importance.png` | Horizontal feature importance for Residual_RF |
+| `champion_model.pkl` | Serialised champion model for production deployment |
+
+### Customising the physics constants
+
+If you have tuned `.env` parameters (e.g. `PHYSICS_SPEED`, `BATTERY_DECAY_EXPONENT`),
+update the matching constants in **Section 4** of the notebook (`PHYSICS_SPEED`,
+`TURN_SPEED_DEG_PER_SEC`) to keep the Residual strategy's physics baseline in sync.
+
 ## Testing
 
 Install dependencies first:

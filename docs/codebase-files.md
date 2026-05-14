@@ -27,6 +27,21 @@ High-level developer guide for understanding the system architecture and runtime
 ### `/docs/codebase-files.md`
 This file. It gives a file-by-file reference for the repository.
 
+## Notebook
+
+### `/discovery_analysis.ipynb`
+Self-contained Jupyter Notebook for offline analysis of run history and tournament evaluation.
+
+Sections:
+1. **Setup & Data Generation** — generates synthetic data if `run_history.csv` is absent
+2. **Data Loading & Cleaning** — loads CSV, applies Transfer Learning weights, parses shadow predictions
+3. **Exploratory Data Analysis** — physics check, debt analysis, error distribution
+4. **Tournament Training & Evaluation** — trains all 6 competitors, ranks by MAE on real hold-out
+5. **Champion Deep-Dive** — detailed Residual_RF analysis with residual and feature importance plots
+6. **Model Export** — saves the champion to `champion_model.pkl`
+
+See `docs/README.md` → *Discovery Analysis Notebook* for full usage instructions.
+
 ## Application package: `/robot_positioning`
 
 ### `/robot_positioning/__init__.py`
