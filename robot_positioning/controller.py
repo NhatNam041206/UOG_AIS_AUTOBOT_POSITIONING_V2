@@ -81,7 +81,7 @@ class TournamentManager:
         simulated_runs = self.physics_env.generate_runs(run_count, is_simulated=True)
         self._append_runs(simulated_runs)
         history = self.load_history()
-        self._reset_round()
+        self._reset_disqualifications()
         self.train_all(history, use_grid_search=True)
         champion = self.elect_champion(history)
         self.logger.info("Experimental phase completed with champion %s", champion)
@@ -92,7 +92,7 @@ class TournamentManager:
         if not history:
             raise RuntimeError("Production requires prior experimental history")
         self._load_saved_champion()
-        self._reset_round()
+        self._reset_disqualifications()
         self.train_all(history, use_grid_search=False)
         if not self.champion_name:
             self.elect_champion(history)
@@ -125,7 +125,7 @@ class TournamentManager:
                 run.actual_time,
             )
             if index % self.eval_interval == 0:
-                self._reset_round()
+                self._reset_disqualifications()
                 self.train_all(history, use_grid_search=False)
                 self.elect_champion(history)
         return outputs
@@ -170,7 +170,7 @@ class TournamentManager:
                     scores[competitor.name] = fmean(errors)
         if not scores:
             raise RuntimeError("No qualified models available to elect a champion")
-        champion = min(scores, key=scores.get)
+        champion = min(scores, key=lambda name: scores[name])
         if champion != self.champion_name:
             previous = self.champion_name or "None"
             self.logger.info("Switching from %s to %s due to lower MAE", previous, champion)
@@ -213,7 +213,7 @@ class TournamentManager:
             self.champion_name = chosen
         return chosen
 
-    def _reset_round(self) -> None:
+    def _reset_disqualifications(self) -> None:
         for competitor in self.competitors.values():
             competitor.disqualified = False
 
