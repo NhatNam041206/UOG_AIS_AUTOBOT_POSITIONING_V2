@@ -30,12 +30,14 @@ COMMAND_FORWARD = 0
 COMMAND_TURN_LEFT = 1
 COMMAND_TURN_RIGHT = 2
 TURN_COMMAND_IDS = (COMMAND_TURN_LEFT, COMMAND_TURN_RIGHT)
+MIN_EXPECTED_TIME_SECONDS = 0.1
 MIN_FORWARD_SPEED_DIVISOR = 0.1
 MIN_TURN_SPEED_DIVISOR = 1.0
 PREV_RESIDUAL_DRIFT_FACTOR = 0.15
 ADDITIONAL_RESIDUAL_ANGULAR_FACTOR = 0.05
 FORWARD_ERROR_SCALE = 0.05
 TURN_ERROR_SCALE = 0.08
+PREV_RESIDUAL_GAUSSIAN_MEAN_FACTOR = 0.1
 PREV_RESIDUAL_DECAY = 0.5
 DRIFT_CONTRIBUTION = 0.3
 
@@ -79,8 +81,8 @@ class RunRecord:
 
     def expected_time(self) -> float:
         if self.command_id == COMMAND_FORWARD:
-            return max(0.1, self.target_units / max(self.forward_units_per_second, MIN_FORWARD_SPEED_DIVISOR))
-        return max(0.1, self.target_units / max(self.turn_degrees_per_second, MIN_TURN_SPEED_DIVISOR))
+            return max(MIN_EXPECTED_TIME_SECONDS, self.target_units / max(self.forward_units_per_second, MIN_FORWARD_SPEED_DIVISOR))
+        return max(MIN_EXPECTED_TIME_SECONDS, self.target_units / max(self.turn_degrees_per_second, MIN_TURN_SPEED_DIVISOR))
 
     def to_csv_row(self) -> dict[str, str | float | int]:
         return {
@@ -198,7 +200,7 @@ class MockPhysicsEnv:
         environment_bias = 0.0 if is_simulated else self.real_world_bias
         noise = self._random.gauss(0.0, self.noise_std * (1.0 if is_simulated else 1.5))
         actual_time_consumed = max(
-            0.1,
+            MIN_EXPECTED_TIME_SECONDS,
             expected_time
             + battery_penalty
             + angular_penalty
@@ -211,7 +213,7 @@ class MockPhysicsEnv:
         command_error_scale = FORWARD_ERROR_SCALE if command_id == COMMAND_FORWARD else TURN_ERROR_SCALE
         noise_scale = 0.6 if is_simulated else 1.0
         error_cm_or_deg = self._random.gauss(
-            prev_residual_angle * 0.1,
+            prev_residual_angle * PREV_RESIDUAL_GAUSSIAN_MEAN_FACTOR,
             max(command_error_scale * target_units * noise_scale, 0.001),
         )
         actual_dist_reached = target_units - error_cm_or_deg
@@ -240,8 +242,8 @@ class MockPhysicsEnv:
 
     def _expected_time(self, command_id: int, target_units: float) -> float:
         if command_id == COMMAND_FORWARD:
-            return max(0.1, target_units / max(self.speed, MIN_FORWARD_SPEED_DIVISOR))
-        return max(0.1, target_units / max(self.turn_speed_deg_per_sec, MIN_TURN_SPEED_DIVISOR))
+            return max(MIN_EXPECTED_TIME_SECONDS, target_units / max(self.speed, MIN_FORWARD_SPEED_DIVISOR))
+        return max(MIN_EXPECTED_TIME_SECONDS, target_units / max(self.turn_speed_deg_per_sec, MIN_TURN_SPEED_DIVISOR))
 
 
 def write_run_history(path: Path, records: Iterable[RunRecord]) -> None:
