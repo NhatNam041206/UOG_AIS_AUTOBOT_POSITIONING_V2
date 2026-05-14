@@ -42,6 +42,23 @@ PREV_RESIDUAL_DECAY = 0.5
 DRIFT_CONTRIBUTION = 0.3
 
 
+def calculate_expected_time(
+    command_id: int,
+    target_units: float,
+    forward_units_per_second: float,
+    turn_degrees_per_second: float,
+) -> float:
+    if command_id == COMMAND_FORWARD:
+        return max(
+            MIN_EXPECTED_TIME_SECONDS,
+            target_units / max(forward_units_per_second, MIN_FORWARD_SPEED_DIVISOR),
+        )
+    return max(
+        MIN_EXPECTED_TIME_SECONDS,
+        target_units / max(turn_degrees_per_second, MIN_TURN_SPEED_DIVISOR),
+    )
+
+
 @dataclass
 class RunRecord:
     run_id: int | None = None
@@ -64,8 +81,8 @@ class RunRecord:
     turn_degrees_per_second: float = 90.0
 
     def features(self) -> list[float]:
-        command_battery_interaction = self.start_battery_v * float(self.command_id)
-        turn_debt_interaction = self.prev_residual_angle * float(self.command_id)
+        command_battery_product = self.start_battery_v * float(self.command_id)
+        turn_debt_product = self.prev_residual_angle * float(self.command_id)
         return [
             float(self.command_id),
             self.target_units,
@@ -75,14 +92,17 @@ class RunRecord:
             float(self.calibrations_count),
             self.total_calib_time,
             self.avg_drift_angle,
-            command_battery_interaction,
-            turn_debt_interaction,
+            command_battery_product,
+            turn_debt_product,
         ]
 
     def expected_time(self) -> float:
-        if self.command_id == COMMAND_FORWARD:
-            return max(MIN_EXPECTED_TIME_SECONDS, self.target_units / max(self.forward_units_per_second, MIN_FORWARD_SPEED_DIVISOR))
-        return max(MIN_EXPECTED_TIME_SECONDS, self.target_units / max(self.turn_degrees_per_second, MIN_TURN_SPEED_DIVISOR))
+        return calculate_expected_time(
+            command_id=self.command_id,
+            target_units=self.target_units,
+            forward_units_per_second=self.forward_units_per_second,
+            turn_degrees_per_second=self.turn_degrees_per_second,
+        )
 
     def to_csv_row(self) -> dict[str, str | float | int]:
         return {
@@ -217,6 +237,8 @@ class MockPhysicsEnv:
             max(command_error_scale * target_units * noise_scale, 0.001),
         )
         actual_dist_reached = target_units - error_cm_or_deg
+        # Turns carry their resulting angle error directly as debt for the next segment,
+        # while forward segments decay prior debt and blend in current measured drift.
         next_residual_angle = (
             error_cm_or_deg
             if command_id in TURN_COMMAND_IDS
@@ -241,9 +263,12 @@ class MockPhysicsEnv:
         ), command_id, next_residual_angle
 
     def _expected_time(self, command_id: int, target_units: float) -> float:
-        if command_id == COMMAND_FORWARD:
-            return max(MIN_EXPECTED_TIME_SECONDS, target_units / max(self.speed, MIN_FORWARD_SPEED_DIVISOR))
-        return max(MIN_EXPECTED_TIME_SECONDS, target_units / max(self.turn_speed_deg_per_sec, MIN_TURN_SPEED_DIVISOR))
+        return calculate_expected_time(
+            command_id=command_id,
+            target_units=target_units,
+            forward_units_per_second=self.speed,
+            turn_degrees_per_second=self.turn_speed_deg_per_sec,
+        )
 
 
 def write_run_history(path: Path, records: Iterable[RunRecord]) -> None:
