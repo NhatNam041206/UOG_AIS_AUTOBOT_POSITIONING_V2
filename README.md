@@ -22,6 +22,6 @@ Python MVC/OOP robot positioning estimation engine with a digital-twin experimen
 
 ## Key outputs
 
-- `run_history.csv`: saved run history with the `is_simulated` flag.
+- `run_history.csv`: saved per-segment run history using command/sequential features and tournament metadata (`active_champion_id`, `shadow_predictions_json`).
 - `system.log`: run/error/champion-switch logging.
 - `champion_model.pkl`: persisted champion metadata.

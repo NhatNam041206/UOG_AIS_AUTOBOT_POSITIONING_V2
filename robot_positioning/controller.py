@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import pickle
 from dataclasses import dataclass, field
@@ -115,23 +116,26 @@ class TournamentManager:
             if not predictions:
                 raise RuntimeError("All tournament models were disqualified")
             active_model = self._choose_active_model(predictions)
-            run.active_model = active_model
+            run.active_champion_id = active_model
+            run.shadow_predictions_json = json.dumps(
+                {name: float(value) for name, value in sorted(predictions.items()) if name != active_model},
+            )
             self._append_runs([run])
             history.append(run)
             outputs.append(
                 self.dashboard.render(
                     champion=self.champion_name,
-                    battery_level=run.battery_level,
+                    start_battery_v=run.start_battery_v,
                     active_model=active_model,
                     predictions=predictions,
                 )
             )
             self.logger.info(
-                "Run %s recorded (simulated=%s, active_model=%s, actual_time=%.4f)",
+                "Run %s recorded (simulated=%s, active_model=%s, actual_time_consumed=%.4f)",
                 run.run_id,
                 run.is_simulated,
                 active_model,
-                run.actual_time,
+                run.actual_time_consumed,
             )
             if index % self.eval_interval == 0:
                 self._reset_disqualifications()
@@ -158,7 +162,7 @@ class TournamentManager:
             try:
                 raw_prediction = competitor.estimator.predict([run.features()])[0]
                 predicted_time = competitor.strategy.prediction_to_time(run, raw_prediction)
-                competitor.real_errors.append(abs(predicted_time - run.actual_time))
+                competitor.real_errors.append(abs(predicted_time - run.actual_time_consumed))
                 predictions[competitor.name] = predicted_time
             except Exception as exc:
                 competitor.disqualified = True
@@ -196,7 +200,7 @@ class TournamentManager:
             try:
                 raw_prediction = competitor.estimator.predict([record.features()])[0]
                 predicted_time = competitor.strategy.prediction_to_time(record, raw_prediction)
-                errors.append(abs(predicted_time - record.actual_time))
+                errors.append(abs(predicted_time - record.actual_time_consumed))
             except Exception as exc:
                 competitor.disqualified = True
                 self.logger.exception("Disqualifying %s during scoring: %s", competitor.name, exc)
