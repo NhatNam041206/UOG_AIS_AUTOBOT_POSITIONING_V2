@@ -17,8 +17,18 @@ Python MVC/OOP robot positioning estimation engine with a digital-twin experimen
 
 ## Documentation
 
-- `docs/README.md`: high-level developer guide
+- `docs/README.md`: high-level developer guide (includes notebook usage)
 - `docs/codebase-files.md`: file-by-file codebase reference
+
+## Discovery Analysis
+
+Open `discovery_analysis.ipynb` in Jupyter for offline EDA, tournament model training, and
+champion export.  The notebook is self-contained and generates synthetic data automatically
+if `run_history.csv` is not yet present.
+
+```bash
+jupyter notebook discovery_analysis.ipynb
+```
 
 ## Key outputs
 
