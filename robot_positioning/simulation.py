@@ -26,6 +26,12 @@ CSV_FIELDNAMES = [
     "active_champion_id",
     "shadow_predictions_json",
 ]
+COMMAND_FORWARD = 0
+COMMAND_TURN_LEFT = 1
+COMMAND_TURN_RIGHT = 2
+TURN_COMMAND_IDS = (COMMAND_TURN_LEFT, COMMAND_TURN_RIGHT)
+MIN_FORWARD_SPEED_DIVISOR = 0.1
+MIN_TURN_SPEED_DIVISOR = 1.0
 PREV_RESIDUAL_DRIFT_FACTOR = 0.15
 ADDITIONAL_RESIDUAL_ANGULAR_FACTOR = 0.05
 FORWARD_ERROR_SCALE = 0.05
@@ -72,9 +78,9 @@ class RunRecord:
         ]
 
     def expected_time(self) -> float:
-        if self.command_id == 0:
-            return max(0.1, self.target_units / max(self.forward_units_per_second, 0.1))
-        return max(0.1, self.target_units / max(self.turn_degrees_per_second, 1.0))
+        if self.command_id == COMMAND_FORWARD:
+            return max(0.1, self.target_units / max(self.forward_units_per_second, MIN_FORWARD_SPEED_DIVISOR))
+        return max(0.1, self.target_units / max(self.turn_degrees_per_second, MIN_TURN_SPEED_DIVISOR))
 
     def to_csv_row(self) -> dict[str, str | float | int]:
         return {
@@ -170,10 +176,10 @@ class MockPhysicsEnv:
         prev_cmd_id: int = 0,
         prev_residual_angle: float = 0.0,
     ) -> tuple[RunRecord, int, float]:
-        command_id = self._random.choice([0, 1, 2])
+        command_id = self._random.choice([COMMAND_FORWARD, COMMAND_TURN_LEFT, COMMAND_TURN_RIGHT])
         target_units = (
             self._random.uniform(self.distance_min, self.distance_max)
-            if command_id == 0
+            if command_id == COMMAND_FORWARD
             else self._random.uniform(self.turn_target_min_deg, self.turn_target_max_deg)
         )
         start_battery_v = self._random.uniform(self.battery_min, self.battery_max)
@@ -183,10 +189,7 @@ class MockPhysicsEnv:
         total_calib_time = calibrations_count * self._random.uniform(0.03, 0.25)
         terrain_factor = self._random.uniform(self.terrain_min, self.terrain_max)
         payload = self._random.uniform(self.payload_min, self.payload_max)
-        expected_time = max(
-            0.1,
-            target_units / max(self.speed, 0.1) if command_id == 0 else target_units / max(self.turn_speed_deg_per_sec, 1.0),
-        )
+        expected_time = self._expected_time(command_id, target_units)
         battery_penalty = expected_time * ((1 / max(start_battery_v, 0.05) ** self.battery_decay_exponent) - 1)
         angular_penalty = (
             abs(avg_drift_angle + prev_residual_angle * ADDITIONAL_RESIDUAL_ANGULAR_FACTOR) * self.angular_drift_factor
@@ -205,7 +208,7 @@ class MockPhysicsEnv:
             + environment_bias
             + noise,
         )
-        command_error_scale = FORWARD_ERROR_SCALE if command_id == 0 else TURN_ERROR_SCALE
+        command_error_scale = FORWARD_ERROR_SCALE if command_id == COMMAND_FORWARD else TURN_ERROR_SCALE
         noise_scale = 0.6 if is_simulated else 1.0
         error_cm_or_deg = self._random.gauss(
             prev_residual_angle * 0.1,
@@ -214,7 +217,7 @@ class MockPhysicsEnv:
         actual_dist_reached = target_units - error_cm_or_deg
         next_residual_angle = (
             error_cm_or_deg
-            if command_id in (1, 2)
+            if command_id in TURN_COMMAND_IDS
             else (prev_residual_angle * PREV_RESIDUAL_DECAY) + (avg_drift_angle * DRIFT_CONTRIBUTION)
         )
         return RunRecord(
@@ -234,6 +237,11 @@ class MockPhysicsEnv:
             forward_units_per_second=self.speed,
             turn_degrees_per_second=self.turn_speed_deg_per_sec,
         ), command_id, next_residual_angle
+
+    def _expected_time(self, command_id: int, target_units: float) -> float:
+        if command_id == COMMAND_FORWARD:
+            return max(0.1, target_units / max(self.speed, MIN_FORWARD_SPEED_DIVISOR))
+        return max(0.1, target_units / max(self.turn_speed_deg_per_sec, MIN_TURN_SPEED_DIVISOR))
 
 
 def write_run_history(path: Path, records: Iterable[RunRecord]) -> None:
