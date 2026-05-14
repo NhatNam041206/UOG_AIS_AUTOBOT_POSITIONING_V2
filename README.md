@@ -15,6 +15,11 @@ Python MVC/OOP robot positioning estimation engine with a digital-twin experimen
    ```
 4. Switch `APP_MODE=PRODUCTION` and run again to execute interleaved production evaluation.
 
+## Documentation
+
+- `docs/README.md`: high-level developer guide
+- `docs/codebase-files.md`: file-by-file codebase reference
+
 ## Key outputs
 
 - `run_history.csv`: saved run history with the `is_simulated` flag.
