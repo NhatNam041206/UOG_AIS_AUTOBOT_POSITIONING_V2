@@ -57,6 +57,7 @@ Responsibilities:
 - load the `.env` file
 - create the `TournamentManager`
 - choose between experiment mode and production mode
+- ensure resource cleanup by calling `manager.close()` after execution completes
 
 This is the best place to look when you want to understand how execution begins.
 
@@ -134,7 +135,7 @@ Key types:
 Responsibilities of `TournamentManager`:
 
 - build the model pool
-- create the logger
+- create the logger and manage its lifecycle
 - run the experiment phase
 - run the production phase
 - train all competitors with sample weights
@@ -143,6 +144,7 @@ Responsibilities of `TournamentManager`:
 - compare MAE values and elect the champion
 - save and reload champion metadata
 - rotate active models during production for interleaved testing
+- provide `close()` method to release file handles and prevent resource leaks
 
 If a new developer wants to understand the application's behavior, this is the most important file in the repository.
 

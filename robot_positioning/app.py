@@ -14,15 +14,18 @@ def main() -> None:
 
     env = EnvHelper(args.env_file)
     manager = TournamentManager(env)
-    mode = env.get_val("APP_MODE", str, default="EXPERIMENT").upper()
-    if mode == "EXPERIMENT":
-        champion = manager.run_experiment()
-        print(f"Experimental champion: {champion}")
-        return
-    if args.production_runs is not None:
-        manager.run_production(manager.physics_env.generate_runs(args.production_runs, is_simulated=False))
-        return
-    manager.run_production()
+    try:
+        mode = env.get_val("APP_MODE", str, default="EXPERIMENT").upper()
+        if mode == "EXPERIMENT":
+            champion = manager.run_experiment()
+            print(f"Experimental champion: {champion}")
+            return
+        if args.production_runs is not None:
+            manager.run_production(manager.physics_env.generate_runs(args.production_runs, is_simulated=False))
+            return
+        manager.run_production()
+    finally:
+        manager.close()
 
 
 if __name__ == "__main__":
