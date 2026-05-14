@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Robot positioning runtime artifacts
+run_history.csv
+system.log
+champion_model.pkl
