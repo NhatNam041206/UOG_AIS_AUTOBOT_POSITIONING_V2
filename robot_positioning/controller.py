@@ -6,12 +6,15 @@ import pickle
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import fmean
+from typing import Callable
 
 from .config import EnvHelper
 from .models import BaseEstimator, LinearEstimator, RandomForestEstimator, XGBoostEstimator
 from .simulation import MockPhysicsEnv, RunRecord, read_run_history, write_run_history
 from .strategies import DirectStrategy, EstimationStrategy, ResidualStrategy
 from .view import TerminalDashboard
+
+MIN_BASELINE_TIME = 1e-6
 
 
 @dataclass
@@ -85,7 +88,7 @@ class TournamentManager:
             "n_estimators": self._parse_int_options("XGB_N_ESTIMATORS_OPTIONS", [60, 100]),
         }
 
-        factories: dict[str, callable] = {
+        factories: dict[str, Callable[[], BaseEstimator]] = {
             "linear": lambda: LinearEstimator(lr_grid),
             "random_forest": lambda: RandomForestEstimator(rf_grid),
             "xgboost": lambda: XGBoostEstimator(xgb_grid),
@@ -104,10 +107,8 @@ class TournamentManager:
                 name = f"{strategy.short_name}_{estimator.short_name}"
                 competitors[name] = Competitor(name=name, strategy=strategy, estimator=estimator)
 
-        if len(competitors) != 6 and set(selected_models) == {"linear", "random_forest", "xgboost"}:
+        if len(competitors) != 6:
             raise ValueError("Tournament must include 6 competitors (3 estimators × 2 strategies)")
-        if not competitors:
-            raise ValueError("MODELS_TO_USE did not produce any valid competitors")
         return competitors
 
     def run_experiment(self) -> str:
@@ -220,9 +221,10 @@ class TournamentManager:
         return champion
 
     def distribute_time(self, predicted_total_time: float, run: RunRecord) -> dict[str, float]:
+        """Split total route time proportionally into forward and turning budgets."""
         forward_baseline = run.total_tiles * self.physics_env.tile_time
         turn_baseline = run.num_corners * self.physics_env.turn_time
-        baseline_total = max(forward_baseline + turn_baseline, 1e-6)
+        baseline_total = max(forward_baseline + turn_baseline, MIN_BASELINE_TIME)
 
         forward_share = forward_baseline / baseline_total
         turn_share = turn_baseline / baseline_total
@@ -230,11 +232,14 @@ class TournamentManager:
         forward_time_total = predicted_total_time * forward_share
         turn_time_total = predicted_total_time * turn_share
 
+        tile_count = run.total_tiles if run.total_tiles > 0 else 1
+        corner_count = run.num_corners if run.num_corners > 0 else 1
+
         return {
             "forward_time_total": forward_time_total,
             "turn_time_total": turn_time_total,
-            "forward_time_per_tile": forward_time_total / max(run.total_tiles, 1),
-            "turn_time_per_corner": turn_time_total / max(run.num_corners, 1),
+            "forward_time_per_tile": forward_time_total / tile_count,
+            "turn_time_per_corner": turn_time_total / corner_count,
         }
 
     def load_history(self) -> list[RunRecord]:
@@ -261,8 +266,8 @@ class TournamentManager:
                 predicted_time = competitor.strategy.prediction_to_time(record, raw_prediction)
                 errors.append(abs(predicted_time - record.actual_time_total))
             except Exception as exc:
-                self.logger.exception("Disqualifying %s during scoring: %s", competitor.name, exc)
                 competitor.disqualified = True
+                self.logger.exception("Disqualifying %s during scoring: %s", competitor.name, exc)
                 return []
         return errors
 

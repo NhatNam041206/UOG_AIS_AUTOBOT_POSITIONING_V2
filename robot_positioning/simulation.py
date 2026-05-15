@@ -19,6 +19,8 @@ CSV_FIELDNAMES = [
     "endpoint_deviated_deg",
     "is_simulated",
 ]
+MIN_ACTUAL_TIME = 0.001
+MIN_BATTERY_VOLTAGE = 0.01
 
 
 @dataclass
@@ -32,6 +34,18 @@ class RunRecord:
     endpoint_error_cm: float = 0.0
     endpoint_deviated_deg: float = 0.0
     is_simulated: bool = True
+
+    def __post_init__(self) -> None:
+        if self.total_tiles <= 0:
+            raise ValueError("total_tiles must be positive")
+        if self.num_corners <= 0:
+            raise ValueError("num_corners must be positive")
+        if self.start_battery_v <= 0:
+            raise ValueError("start_battery_v must be positive")
+        if self.calibrations_total <= 0:
+            raise ValueError("calibrations_total must be positive")
+        if self.actual_time_total < 0:
+            raise ValueError("actual_time_total cannot be negative")
 
     def features(self) -> list[float]:
         return [
@@ -109,10 +123,10 @@ class MockPhysicsEnv:
         calibrations_total = self._random.randint(self.calibration_min, self.calibration_max)
 
         baseline = self.baseline_time(total_tiles=total_tiles, num_corners=num_corners)
-        voltage_factor = (self.nominal_voltage / max(start_battery_v, 0.01)) ** self.battery_exponent
+        voltage_factor = (self.nominal_voltage / max(start_battery_v, MIN_BATTERY_VOLTAGE)) ** self.battery_exponent
         noise_std = self.noise_std_seconds if is_simulated else self.noise_std_seconds_real
         noise = self._random.gauss(0.0, noise_std)
-        actual_time_total = max(0.001, (baseline * voltage_factor) + noise)
+        actual_time_total = max(MIN_ACTUAL_TIME, (baseline * voltage_factor) + noise)
 
         calibration_damp = 1.0 / max(calibrations_total, 1)
         error_scale = self.endpoint_error_abs_max * calibration_damp

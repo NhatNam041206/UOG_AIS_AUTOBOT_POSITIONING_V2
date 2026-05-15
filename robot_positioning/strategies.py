@@ -28,9 +28,12 @@ class DirectStrategy(EstimationStrategy):
 
 
 class ResidualStrategy(EstimationStrategy):
+    """Learn the time offset from a physics baseline instead of raw total seconds."""
+
     short_name = "Residual"
 
     def __init__(self, tile_time: float, turn_time: float):
+        """Initialize baseline coefficients in seconds-per-tile and seconds-per-corner."""
         self.tile_time = tile_time
         self.turn_time = turn_time
 

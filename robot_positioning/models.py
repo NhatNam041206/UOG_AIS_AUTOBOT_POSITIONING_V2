@@ -11,6 +11,7 @@ class BaseEstimator(ABC):
     short_name = "BASE"
 
     def __init__(self, param_grid: dict[str, list[object]] | None = None):
+        """Create estimator wrapper with optional GridSearchCV parameter search space."""
         self.model = None
         self.best_params: dict[str, object] = {}
         self.param_grid = param_grid or {}

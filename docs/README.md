@@ -23,6 +23,9 @@ Each run uses the schema:
 - `endpoint_deviated_deg` (±15)
 - `is_simulated`
 
+Default ranges in `.env.example` are `total_tiles=20-60`, `num_corners=4-8`,
+`start_battery_v=10.0-12.0`, and `calibrations_total=1-10` (tests may override these).
+
 `MockPhysicsEnv` computes runtime with:
 
 `T_actual = [(Tiles × tile_time) + (Turns × turn_time)] × (nominal_voltage / V_start)^battery_exponent + noise`

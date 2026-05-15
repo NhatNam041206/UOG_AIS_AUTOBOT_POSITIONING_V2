@@ -29,8 +29,8 @@ class TerminalDashboard:
             lines.extend(
                 [
                     "Time Distribution:",
-                    f"- Forward Total: {time_distribution['forward_time_total']:.3f}s",
-                    f"- Turning Total: {time_distribution['turn_time_total']:.3f}s",
+                    f"- Total Forward Time: {time_distribution['forward_time_total']:.3f}s",
+                    f"- Total Turn Time: {time_distribution['turn_time_total']:.3f}s",
                     f"- Forward/Tile: {time_distribution['forward_time_per_tile']:.3f}s",
                     f"- Turn/Corner: {time_distribution['turn_time_per_corner']:.3f}s",
                 ]

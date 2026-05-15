@@ -10,7 +10,13 @@ from robot_positioning.controller import TournamentManager
 from robot_positioning.simulation import RunRecord
 
 
-def write_env(path: Path, mode: str = "EXPERIMENT", eval_interval: int = 10) -> None:
+def write_env(
+    path: Path,
+    mode: str = "EXPERIMENT",
+    eval_interval: int = 10,
+    time_noise_std: float = 0.2,
+    time_noise_std_real: float = 0.4,
+) -> None:
     path.write_text(
         "\n".join(
             [
@@ -26,8 +32,8 @@ def write_env(path: Path, mode: str = "EXPERIMENT", eval_interval: int = 10) -> 
                 "PHYSICS_TURN_TIME=1.8",
                 "PHYSICS_NOMINAL_VOLTAGE=12.0",
                 "BATTERY_DECAY_EXPONENT=1.2",
-                "TIME_NOISE_STD=0.2",
-                "TIME_NOISE_STD_REAL=0.4",
+                f"TIME_NOISE_STD={time_noise_std}",
+                f"TIME_NOISE_STD_REAL={time_noise_std_real}",
                 "TOTAL_TILES_MIN=20",
                 "TOTAL_TILES_MAX=30",
                 "NUM_CORNERS_MIN=4",
@@ -81,6 +87,20 @@ class TournamentManagerTests(unittest.TestCase):
                 self.assertIn("Champion:", outputs[-1])
                 self.assertIn("Shadow Predictions:", outputs[-1])
                 self.assertIn("Time Distribution:", outputs[-1])
+                distribution = manager.distribute_time(
+                    predicted_total_time=history_after_production[-1].actual_time_total,
+                    run=history_after_production[-1],
+                )
+                self.assertEqual(
+                    {
+                        "forward_time_total",
+                        "turn_time_total",
+                        "forward_time_per_tile",
+                        "turn_time_per_corner",
+                    },
+                    set(distribution),
+                )
+                self.assertTrue(all(value >= 0.0 for value in distribution.values()))
             finally:
                 manager.close()
 
@@ -88,11 +108,7 @@ class TournamentManagerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             env_path = temp_path / ".env"
-            write_env(env_path)
-            content = env_path.read_text(encoding="utf-8")
-            content = content.replace("TIME_NOISE_STD=0.2", "TIME_NOISE_STD=0.0")
-            content = content.replace("TIME_NOISE_STD_REAL=0.4", "TIME_NOISE_STD_REAL=0.0")
-            env_path.write_text(content, encoding="utf-8")
+            write_env(env_path, time_noise_std=0.0, time_noise_std_real=0.0)
 
             env = EnvHelper(env_path)
             manager = TournamentManager(env)
@@ -104,7 +120,7 @@ class TournamentManagerTests(unittest.TestCase):
             finally:
                 manager.close()
 
-    def test_retrain_after_each_production_run(self) -> None:
+    def test_train_all_called_per_production_run(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             env_path = temp_path / ".env"
@@ -121,8 +137,9 @@ class TournamentManagerTests(unittest.TestCase):
                     return original_train_all(history, use_grid_search)
 
                 manager.train_all = wrapped  # type: ignore[method-assign]
-                manager.run_production(manager.physics_env.generate_runs(3, is_simulated=False))
-                self.assertEqual(4, counter["calls"])  # initial training + 3 per-run retrains
+                actual_runs = manager.physics_env.generate_runs(3, is_simulated=False)
+                manager.run_production(actual_runs)
+                self.assertEqual(1 + len(actual_runs), counter["calls"])  # initial training + per-run retrains
             finally:
                 manager.close()
 
