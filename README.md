@@ -1,6 +1,6 @@
 # UOG_AIS_AUTOBOT_POSITIONING_V2
 
-Python MVC/OOP robot positioning estimation engine with a digital-twin experiment phase and a transfer-learning production phase.
+Python MVC/OOP robot endpoint estimation engine with a tournament of AI models for route-time prediction.
 
 ## Setup
 
@@ -9,29 +9,37 @@ Python MVC/OOP robot positioning estimation engine with a digital-twin experimen
    python -m pip install -r requirements.txt
    ```
 2. Copy `.env.example` to `.env` and tune the physics/config values.
-3. Run the experiment phase:
+3. Run experiment mode:
    ```bash
    python -m robot_positioning --env-file .env
    ```
-4. Switch `APP_MODE=PRODUCTION` and run again to execute interleaved production evaluation.
+4. Switch `APP_MODE=PRODUCTION` to run real-world adaptation and champion re-evaluation.
 
-## Documentation
+## Core Engine Highlights
 
-- `docs/README.md`: high-level developer guide (includes notebook usage)
-- `docs/codebase-files.md`: file-by-file codebase reference
+- **MockPhysicsEnv** uses:
+  - `T_actual = [(Tiles × 1.2) + (Turns × 1.8)] × (12.0 / V_start)^1.2 + Noise`
+- **6-model tournament**:
+  - `[LinearRegression, RandomForest, XGBoost] × [Direct, Residual]`
+- **Champion election**:
+  - every `EVAL_INTERVAL` runs (default 10)
+  - lowest MAE on **real-world data only**
+- **Transfer learning**:
+  - weighted fit (`SIM_WEIGHT=0.2`, `REAL_WEIGHT=1.0` by default)
+  - retraining after each production run
+- **Time distribution helper**:
+  - splits predicted total time into forward vs turning command budgets
 
-## Discovery Analysis
+## Notebook
 
-Open `discovery_analysis.ipynb` in Jupyter for offline EDA, tournament model training, and
-champion export.  The notebook is self-contained and generates synthetic data automatically
-if `run_history.csv` is not yet present.
+Open `robot_discovery.ipynb` for EDA and tournament visualization:
 
 ```bash
-jupyter notebook discovery_analysis.ipynb
+jupyter notebook robot_discovery.ipynb
 ```
 
-## Key outputs
+## Testing
 
-- `run_history.csv`: saved per-segment run history using command/sequential features and tournament metadata (`active_champion_id`, `shadow_predictions_json`).
-- `system.log`: run/error/champion-switch logging.
-- `champion_model.pkl`: persisted champion metadata.
+```bash
+python -m unittest discover -s tests -v
+```

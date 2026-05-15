@@ -10,118 +10,48 @@ from .config import EnvHelper
 
 CSV_FIELDNAMES = [
     "run_id",
-    "segment_index",
-    "is_simulated",
-    "command_id",
-    "target_units",
+    "total_tiles",
+    "num_corners",
     "start_battery_v",
-    "prev_cmd_id",
-    "prev_residual_angle",
-    "calibrations_count",
-    "total_calib_time",
-    "avg_drift_angle",
-    "actual_time_consumed",
-    "actual_dist_reached",
-    "error_cm_or_deg",
-    "active_champion_id",
-    "shadow_predictions_json",
+    "calibrations_total",
+    "actual_time_total",
+    "endpoint_error_cm",
+    "endpoint_deviated_deg",
+    "is_simulated",
 ]
-COMMAND_FORWARD = 0
-COMMAND_TURN_LEFT = 1
-COMMAND_TURN_RIGHT = 2
-TURN_COMMAND_IDS = (COMMAND_TURN_LEFT, COMMAND_TURN_RIGHT)
-MIN_EXPECTED_TIME_SECONDS = 0.1
-MIN_FORWARD_SPEED_DIVISOR = 0.1
-MIN_TURN_SPEED_DIVISOR = 1.0
-PREV_RESIDUAL_DRIFT_FACTOR = 0.15
-ADDITIONAL_RESIDUAL_ANGULAR_FACTOR = 0.05
-FORWARD_ERROR_SCALE = 0.05
-TURN_ERROR_SCALE = 0.08
-PREV_RESIDUAL_GAUSSIAN_MEAN_FACTOR = 0.1
-PREV_RESIDUAL_DECAY = 0.5
-DRIFT_CONTRIBUTION = 0.3
-
-
-def calculate_expected_time(
-    command_id: int,
-    target_units: float,
-    forward_units_per_second: float,
-    turn_degrees_per_second: float,
-) -> float:
-    if command_id == COMMAND_FORWARD:
-        return max(
-            MIN_EXPECTED_TIME_SECONDS,
-            target_units / max(forward_units_per_second, MIN_FORWARD_SPEED_DIVISOR),
-        )
-    return max(
-        MIN_EXPECTED_TIME_SECONDS,
-        target_units / max(turn_degrees_per_second, MIN_TURN_SPEED_DIVISOR),
-    )
 
 
 @dataclass
 class RunRecord:
     run_id: int | None = None
-    segment_index: int = 1
+    total_tiles: int = 20
+    num_corners: int = 4
+    start_battery_v: float = 12.0
+    calibrations_total: int = 1
+    actual_time_total: float = 0.0
+    endpoint_error_cm: float = 0.0
+    endpoint_deviated_deg: float = 0.0
     is_simulated: bool = True
-    command_id: int = 0
-    target_units: float = 0.0
-    start_battery_v: float = 0.0
-    prev_cmd_id: int = 0
-    prev_residual_angle: float = 0.0
-    calibrations_count: int = 0
-    total_calib_time: float = 0.0
-    avg_drift_angle: float = 0.0
-    actual_time_consumed: float = 0.0
-    actual_dist_reached: float = 0.0
-    error_cm_or_deg: float = 0.0
-    active_champion_id: str = ""
-    shadow_predictions_json: str = "{}"
-    forward_units_per_second: float = 1.7
-    turn_degrees_per_second: float = 90.0
 
     def features(self) -> list[float]:
-        command_battery_product = self.start_battery_v * float(self.command_id)
-        turn_debt_product = self.prev_residual_angle * float(self.command_id)
         return [
-            float(self.command_id),
-            self.target_units,
+            float(self.total_tiles),
+            float(self.num_corners),
             self.start_battery_v,
-            float(self.prev_cmd_id),
-            self.prev_residual_angle,
-            float(self.calibrations_count),
-            self.total_calib_time,
-            self.avg_drift_angle,
-            command_battery_product,
-            turn_debt_product,
+            float(self.calibrations_total),
         ]
-
-    def expected_time(self) -> float:
-        return calculate_expected_time(
-            command_id=self.command_id,
-            target_units=self.target_units,
-            forward_units_per_second=self.forward_units_per_second,
-            turn_degrees_per_second=self.turn_degrees_per_second,
-        )
 
     def to_csv_row(self) -> dict[str, str | float | int]:
         return {
             "run_id": self.run_id or "",
-            "segment_index": self.segment_index,
-            "is_simulated": str(self.is_simulated).lower(),
-            "command_id": self.command_id,
-            "target_units": self.target_units,
+            "total_tiles": self.total_tiles,
+            "num_corners": self.num_corners,
             "start_battery_v": self.start_battery_v,
-            "prev_cmd_id": self.prev_cmd_id,
-            "prev_residual_angle": self.prev_residual_angle,
-            "calibrations_count": self.calibrations_count,
-            "total_calib_time": self.total_calib_time,
-            "avg_drift_angle": self.avg_drift_angle,
-            "actual_time_consumed": self.actual_time_consumed,
-            "actual_dist_reached": self.actual_dist_reached,
-            "error_cm_or_deg": self.error_cm_or_deg,
-            "active_champion_id": self.active_champion_id,
-            "shadow_predictions_json": self.shadow_predictions_json,
+            "calibrations_total": self.calibrations_total,
+            "actual_time_total": self.actual_time_total,
+            "endpoint_error_cm": self.endpoint_error_cm,
+            "endpoint_deviated_deg": self.endpoint_deviated_deg,
+            "is_simulated": str(self.is_simulated).lower(),
         }
 
     @classmethod
@@ -129,145 +59,80 @@ class RunRecord:
         run_id = int(row["run_id"]) if row.get("run_id") else None
         return cls(
             run_id=run_id,
-            segment_index=int(row["segment_index"]),
-            is_simulated=row["is_simulated"].strip().lower() == "true",
-            command_id=int(row["command_id"]),
-            target_units=float(row["target_units"]),
+            total_tiles=int(row["total_tiles"]),
+            num_corners=int(row["num_corners"]),
             start_battery_v=float(row["start_battery_v"]),
-            prev_cmd_id=int(row["prev_cmd_id"]),
-            prev_residual_angle=float(row["prev_residual_angle"]),
-            calibrations_count=int(row["calibrations_count"]),
-            total_calib_time=float(row["total_calib_time"]),
-            avg_drift_angle=float(row["avg_drift_angle"]),
-            actual_time_consumed=float(row["actual_time_consumed"]),
-            actual_dist_reached=float(row["actual_dist_reached"]),
-            error_cm_or_deg=float(row["error_cm_or_deg"]),
-            active_champion_id=row.get("active_champion_id", ""),
-            shadow_predictions_json=row.get("shadow_predictions_json", "{}"),
+            calibrations_total=int(row["calibrations_total"]),
+            actual_time_total=float(row["actual_time_total"]),
+            endpoint_error_cm=float(row["endpoint_error_cm"]),
+            endpoint_deviated_deg=float(row["endpoint_deviated_deg"]),
+            is_simulated=row["is_simulated"].strip().lower() == "true",
         )
 
 
 class MockPhysicsEnv:
-    """Digital twin used for simulation and production rehearsal data."""
+    """Digital twin for route-time and endpoint behavior."""
 
     def __init__(self, env: EnvHelper):
         seed = env.get_val("RANDOM_SEED", int, default=42)
         self._random = random.Random(seed)
-        self.speed = env.get_val("PHYSICS_SPEED", float, required=True)
-        self.turn_speed_deg_per_sec = env.get_val("TURN_SPEED_DEG_PER_SEC", float, default=90.0)
-        self.battery_decay_exponent = env.get_val("BATTERY_DECAY_EXPONENT", float, required=True)
-        self.angular_drift_factor = env.get_val("ANGULAR_DRIFT_FACTOR", float, required=True)
-        self.payload_factor = env.get_val("PAYLOAD_FACTOR", float, required=True)
-        self.noise_std = env.get_val("NOISE_STD", float, required=True)
-        self.real_world_bias = env.get_val("REAL_WORLD_BIAS", float, required=True)
-        self.distance_min = env.get_val("DISTANCE_MIN", float, required=True)
-        self.distance_max = env.get_val("DISTANCE_MAX", float, required=True)
-        self.battery_min = env.get_val("BATTERY_MIN", float, required=True)
-        self.battery_max = env.get_val("BATTERY_MAX", float, required=True)
-        self.heading_min = env.get_val("HEADING_MIN", float, required=True)
-        self.heading_max = env.get_val("HEADING_MAX", float, required=True)
-        self.terrain_min = env.get_val("TERRAIN_MIN", float, required=True)
-        self.terrain_max = env.get_val("TERRAIN_MAX", float, required=True)
-        self.payload_min = env.get_val("PAYLOAD_MIN", float, required=True)
-        self.payload_max = env.get_val("PAYLOAD_MAX", float, required=True)
-        self.route_segment_count = env.get_val("ROUTE_SEGMENT_COUNT", int, default=7)
-        if self.route_segment_count <= 0:
-            raise ValueError("ROUTE_SEGMENT_COUNT must be at least 1")
-        self.turn_target_min_deg = env.get_val("TURN_TARGET_MIN_DEG", float, default=45.0)
-        self.turn_target_max_deg = env.get_val("TURN_TARGET_MAX_DEG", float, default=90.0)
+        self.tile_time = env.get_val("PHYSICS_TILE_TIME", float, required=True)
+        self.turn_time = env.get_val("PHYSICS_TURN_TIME", float, required=True)
+        self.nominal_voltage = env.get_val("PHYSICS_NOMINAL_VOLTAGE", float, required=True)
+        self.battery_exponent = env.get_val("BATTERY_DECAY_EXPONENT", float, required=True)
+        self.noise_std_seconds = env.get_val("TIME_NOISE_STD", float, required=True)
+        self.noise_std_seconds_real = env.get_val("TIME_NOISE_STD_REAL", float, required=True)
+
+        self.tiles_min = env.get_val("TOTAL_TILES_MIN", int, required=True)
+        self.tiles_max = env.get_val("TOTAL_TILES_MAX", int, required=True)
+        self.corners_min = env.get_val("NUM_CORNERS_MIN", int, required=True)
+        self.corners_max = env.get_val("NUM_CORNERS_MAX", int, required=True)
+        self.battery_min = env.get_val("START_BATTERY_MIN", float, required=True)
+        self.battery_max = env.get_val("START_BATTERY_MAX", float, required=True)
+        self.calibration_min = env.get_val("CALIBRATIONS_MIN", int, required=True)
+        self.calibration_max = env.get_val("CALIBRATIONS_MAX", int, required=True)
+
+        self.endpoint_error_abs_max = env.get_val("ENDPOINT_ERROR_ABS_MAX_CM", float, required=True)
+        self.endpoint_deviated_abs_max = env.get_val("ENDPOINT_DEVIATION_ABS_MAX_DEG", float, required=True)
+        self.real_world_error_multiplier = env.get_val("REAL_WORLD_ERROR_MULTIPLIER", float, required=True)
+
+    def baseline_time(self, total_tiles: int, num_corners: int) -> float:
+        return (total_tiles * self.tile_time) + (num_corners * self.turn_time)
 
     def generate_runs(self, count: int, is_simulated: bool) -> list[RunRecord]:
-        runs: list[RunRecord] = []
-        prev_cmd_id = 0
-        prev_residual_angle = 0.0
-        for index in range(count):
-            segment_index = (index % self.route_segment_count) + 1
-            run, prev_cmd_id, prev_residual_angle = self.generate_run(
-                is_simulated=is_simulated,
-                segment_index=segment_index,
-                prev_cmd_id=prev_cmd_id,
-                prev_residual_angle=prev_residual_angle,
-            )
-            runs.append(run)
-        return runs
+        return [self.generate_run(is_simulated=is_simulated) for _ in range(count)]
 
-    def generate_run(
-        self,
-        is_simulated: bool,
-        segment_index: int = 1,
-        prev_cmd_id: int = 0,
-        prev_residual_angle: float = 0.0,
-    ) -> tuple[RunRecord, int, float]:
-        command_id = self._random.choice([COMMAND_FORWARD, COMMAND_TURN_LEFT, COMMAND_TURN_RIGHT])
-        target_units = (
-            self._random.uniform(self.distance_min, self.distance_max)
-            if command_id == COMMAND_FORWARD
-            else self._random.uniform(self.turn_target_min_deg, self.turn_target_max_deg)
-        )
+    def generate_run(self, is_simulated: bool) -> RunRecord:
+        total_tiles = self._random.randint(self.tiles_min, self.tiles_max)
+        num_corners = self._random.randint(self.corners_min, self.corners_max)
         start_battery_v = self._random.uniform(self.battery_min, self.battery_max)
-        calibrations_count = self._random.randint(0, 2 if is_simulated else 4)
-        drift_base = self._random.uniform(self.heading_min, self.heading_max)
-        avg_drift_angle = drift_base + (prev_residual_angle * PREV_RESIDUAL_DRIFT_FACTOR)
-        total_calib_time = calibrations_count * self._random.uniform(0.03, 0.25)
-        terrain_factor = self._random.uniform(self.terrain_min, self.terrain_max)
-        payload = self._random.uniform(self.payload_min, self.payload_max)
-        expected_time = self._expected_time(command_id, target_units)
-        battery_penalty = expected_time * ((1 / max(start_battery_v, 0.05) ** self.battery_decay_exponent) - 1)
-        angular_penalty = (
-            abs(avg_drift_angle + prev_residual_angle * ADDITIONAL_RESIDUAL_ANGULAR_FACTOR) * self.angular_drift_factor
-        )
-        payload_penalty = payload * self.payload_factor
-        environment_bias = 0.0 if is_simulated else self.real_world_bias
-        noise = self._random.gauss(0.0, self.noise_std * (1.0 if is_simulated else 1.5))
-        actual_time_consumed = max(
-            MIN_EXPECTED_TIME_SECONDS,
-            expected_time
-            + battery_penalty
-            + angular_penalty
-            + payload_penalty
-            + terrain_factor
-            + total_calib_time
-            + environment_bias
-            + noise,
-        )
-        command_error_scale = FORWARD_ERROR_SCALE if command_id == COMMAND_FORWARD else TURN_ERROR_SCALE
-        noise_scale = 0.6 if is_simulated else 1.0
-        error_cm_or_deg = self._random.gauss(
-            prev_residual_angle * PREV_RESIDUAL_GAUSSIAN_MEAN_FACTOR,
-            max(command_error_scale * target_units * noise_scale, 0.001),
-        )
-        actual_dist_reached = target_units - error_cm_or_deg
-        # Turns carry their resulting angle error directly as debt for the next segment,
-        # while forward segments decay prior debt and blend in current measured drift.
-        next_residual_angle = (
-            error_cm_or_deg
-            if command_id in TURN_COMMAND_IDS
-            else (prev_residual_angle * PREV_RESIDUAL_DECAY) + (avg_drift_angle * DRIFT_CONTRIBUTION)
-        )
-        return RunRecord(
-            segment_index=segment_index,
-            is_simulated=is_simulated,
-            command_id=command_id,
-            target_units=target_units,
-            start_battery_v=start_battery_v,
-            prev_cmd_id=prev_cmd_id,
-            prev_residual_angle=prev_residual_angle,
-            calibrations_count=calibrations_count,
-            total_calib_time=total_calib_time,
-            avg_drift_angle=avg_drift_angle,
-            actual_time_consumed=actual_time_consumed,
-            actual_dist_reached=actual_dist_reached,
-            error_cm_or_deg=error_cm_or_deg,
-            forward_units_per_second=self.speed,
-            turn_degrees_per_second=self.turn_speed_deg_per_sec,
-        ), command_id, next_residual_angle
+        calibrations_total = self._random.randint(self.calibration_min, self.calibration_max)
 
-    def _expected_time(self, command_id: int, target_units: float) -> float:
-        return calculate_expected_time(
-            command_id=command_id,
-            target_units=target_units,
-            forward_units_per_second=self.speed,
-            turn_degrees_per_second=self.turn_speed_deg_per_sec,
+        baseline = self.baseline_time(total_tiles=total_tiles, num_corners=num_corners)
+        voltage_factor = (self.nominal_voltage / max(start_battery_v, 0.01)) ** self.battery_exponent
+        noise_std = self.noise_std_seconds if is_simulated else self.noise_std_seconds_real
+        noise = self._random.gauss(0.0, noise_std)
+        actual_time_total = max(0.001, (baseline * voltage_factor) + noise)
+
+        calibration_damp = 1.0 / max(calibrations_total, 1)
+        error_scale = self.endpoint_error_abs_max * calibration_damp
+        angle_scale = self.endpoint_deviated_abs_max * calibration_damp
+        if not is_simulated:
+            error_scale *= self.real_world_error_multiplier
+            angle_scale *= self.real_world_error_multiplier
+
+        endpoint_error_cm = self._random.uniform(-error_scale, error_scale)
+        endpoint_deviated_deg = self._random.uniform(-angle_scale, angle_scale)
+
+        return RunRecord(
+            total_tiles=total_tiles,
+            num_corners=num_corners,
+            start_battery_v=start_battery_v,
+            calibrations_total=calibrations_total,
+            actual_time_total=actual_time_total,
+            endpoint_error_cm=endpoint_error_cm,
+            endpoint_deviated_deg=endpoint_deviated_deg,
+            is_simulated=is_simulated,
         )
 
 

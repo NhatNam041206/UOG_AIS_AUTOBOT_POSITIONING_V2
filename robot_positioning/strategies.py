@@ -21,7 +21,7 @@ class DirectStrategy(EstimationStrategy):
     short_name = "Direct"
 
     def training_target(self, record: RunRecord) -> float:
-        return record.actual_time_consumed
+        return record.actual_time_total
 
     def prediction_to_time(self, record: RunRecord, model_output: float) -> float:
         return max(0.0, model_output)
@@ -30,11 +30,15 @@ class DirectStrategy(EstimationStrategy):
 class ResidualStrategy(EstimationStrategy):
     short_name = "Residual"
 
-    def calculate_residual(self, record: RunRecord) -> float:
-        return record.actual_time_consumed - record.expected_time()
+    def __init__(self, tile_time: float, turn_time: float):
+        self.tile_time = tile_time
+        self.turn_time = turn_time
+
+    def baseline_time(self, record: RunRecord) -> float:
+        return (record.total_tiles * self.tile_time) + (record.num_corners * self.turn_time)
 
     def training_target(self, record: RunRecord) -> float:
-        return self.calculate_residual(record)
+        return record.actual_time_total - self.baseline_time(record)
 
     def prediction_to_time(self, record: RunRecord, model_output: float) -> float:
-        return max(0.0, record.expected_time() + model_output)
+        return max(0.0, self.baseline_time(record) + model_output)

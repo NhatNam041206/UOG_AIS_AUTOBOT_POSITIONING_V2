@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import GridSearchCV
-from sklearn.ensemble import RandomForestRegressor
 
 
 class BaseEstimator(ABC):
     short_name = "BASE"
-    param_grid: dict[str, list[object]] = {}
 
-    def __init__(self) -> None:
+    def __init__(self, param_grid: dict[str, list[object]] | None = None):
         self.model = None
         self.best_params: dict[str, object] = {}
+        self.param_grid = param_grid or {}
 
     @abstractmethod
     def build_model(self, **kwargs):
@@ -47,7 +47,6 @@ class BaseEstimator(ABC):
 
 class LinearEstimator(BaseEstimator):
     short_name = "LR"
-    param_grid = {"fit_intercept": [True, False]}
 
     def build_model(self, **kwargs):
         return LinearRegression(**kwargs)
@@ -55,7 +54,6 @@ class LinearEstimator(BaseEstimator):
 
 class RandomForestEstimator(BaseEstimator):
     short_name = "RF"
-    param_grid = {"n_estimators": [20, 40], "max_depth": [4, 6]}
 
     def build_model(self, **kwargs):
         return RandomForestRegressor(random_state=42, n_jobs=1, **kwargs)
@@ -63,12 +61,11 @@ class RandomForestEstimator(BaseEstimator):
 
 class XGBoostEstimator(BaseEstimator):
     short_name = "XGB"
-    param_grid = {"max_depth": [4, 6], "learning_rate": [0.05, 0.1], "n_estimators": [20]}
 
     def build_model(self, **kwargs):
         try:
             from xgboost import XGBRegressor
-        except ImportError as exc:  # pragma: no cover - protected by dependency checks
+        except ImportError as exc:  # pragma: no cover
             raise RuntimeError("xgboost must be installed to use XGBoostEstimator") from exc
         return XGBRegressor(
             objective="reg:absoluteerror",
